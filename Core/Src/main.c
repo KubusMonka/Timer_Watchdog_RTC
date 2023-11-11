@@ -100,10 +100,8 @@ int main(void)
   MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
 
+HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
 
-
-HAL_TIM_OC_Start(&htim2,TIM_CHANNEL_1);
-HAL_TIM_OC_Start_IT(&htim2,TIM_CHANNEL_2);
 
   /* USER CODE END 2 */
 
@@ -111,6 +109,18 @@ HAL_TIM_OC_Start_IT(&htim2,TIM_CHANNEL_2);
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  uint16_t i;
+	  for (i =0; i<100; i++)
+	  {
+	  	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, i*10 );
+	  	HAL_Delay(10);
+	  }
+	  for (i =100; i>0; i--)
+	  	  {
+	  	  	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, i*10 );
+	  	  HAL_Delay(10);
+	  	  }
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -178,28 +188,7 @@ static void MX_NVIC_Init(void)
 
 /* USER CODE BEGIN 4 */
 
-void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
-{
-	static uint8_t i;
 
-	if(htim->Instance == TIM2)
-	{
-		if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2)
-		{
-			HAL_GPIO_TogglePin(LD_RED_GPIO_Port, LD_RED_Pin);
-			if (i %2)
-			{
-			//1000
-			__HAL_TIM_SET_COMPARE(htim,TIM_CHANNEL_2,1000);
-			}else
-			{
-				__HAL_TIM_SET_COMPARE(htim,TIM_CHANNEL_2,6000);
-			}
-			i++;
-
-		}
-	}
-}
 
 
 
