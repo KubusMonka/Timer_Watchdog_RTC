@@ -95,12 +95,14 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_TIM2_Init();
+  MX_TIM1_Init();
 
   /* Initialize interrupts */
   MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
 
-HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
+HAL_TIM_Base_Start(&htim1);
+HAL_TIM_Base_Start(&htim2);
 
 
   /* USER CODE END 2 */
@@ -109,17 +111,7 @@ HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  uint16_t i;
-	  for (i =0; i<100; i++)
-	  {
-	  	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, i*10 );
-	  	HAL_Delay(10);
-	  }
-	  for (i =100; i>0; i--)
-	  	  {
-	  	  	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, i*10 );
-	  	  HAL_Delay(10);
-	  	  }
+
 
     /* USER CODE END WHILE */
 
@@ -146,7 +138,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
-  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL2;
   RCC_OscInitStruct.PLL.PREDIV = RCC_PREDIV_DIV1;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
@@ -162,12 +154,14 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
   {
     Error_Handler();
   }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART2|RCC_PERIPHCLK_TIM2;
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART2|RCC_PERIPHCLK_TIM1
+                              |RCC_PERIPHCLK_TIM2;
   PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_PCLK1;
+  PeriphClkInit.Tim1ClockSelection = RCC_TIM1CLK_HCLK;
   PeriphClkInit.Tim2ClockSelection = RCC_TIM2CLK_HCLK;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
