@@ -45,13 +45,17 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-volatile uint32_t CounterTim2Chan1;
-volatile uint32_t CounterTim2Chan2;
+
+//		INPUT CAPTURE + BUTTON COMMIT
+//volatile uint32_t CounterTim2Chan1;
+//volatile uint32_t CounterTim2Chan2;
+
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
+static void MX_NVIC_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -91,10 +95,15 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_TIM2_Init();
+
+  /* Initialize interrupts */
+  MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
-//HAL_TIM_Base_Start_IT(&htim1);
-HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
-HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_2);
+
+
+
+HAL_TIM_OC_Start(&htim2,TIM_CHANNEL_1);
+HAL_TIM_OC_Start_IT(&htim2,TIM_CHANNEL_2);
 
   /* USER CODE END 2 */
 
@@ -156,32 +165,42 @@ void SystemClock_Config(void)
   }
 }
 
-/* USER CODE BEGIN 4 */
-//void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-//{
-//	if(TIM1 == htim->Instance )
-//	{
-//	HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-//	}
-//}
-
-void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
+/**
+  * @brief NVIC Configuration.
+  * @retval None
+  */
+static void MX_NVIC_Init(void)
 {
-	if (htim->Instance == TIM2)
-	{
-		if(htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1)
-		{
-			CounterTim2Chan1 = __HAL_TIM_GET_COMPARE(htim, TIM_CHANNEL_1);
-			HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_1);
+  /* TIM2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(TIM2_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(TIM2_IRQn);
+}
 
-		}
-		if(htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2)
+/* USER CODE BEGIN 4 */
+
+void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
+{
+	static uint8_t i;
+
+	if(htim->Instance == TIM2)
+	{
+		if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_2)
 		{
-			CounterTim2Chan2 = __HAL_TIM_GET_COMPARE(htim, TIM_CHANNEL_2);
-			HAL_TIM_IC_Start_IT(&htim2, TIM_CHANNEL_2);
+			HAL_GPIO_TogglePin(LD_RED_GPIO_Port, LD_RED_Pin);
+			if (i %2)
+			{
+			//1000
+			__HAL_TIM_SET_COMPARE(htim,TIM_CHANNEL_2,1000);
+			}else
+			{
+				__HAL_TIM_SET_COMPARE(htim,TIM_CHANNEL_2,6000);
+			}
+			i++;
+
 		}
 	}
 }
+
 
 
 
