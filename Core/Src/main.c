@@ -18,8 +18,8 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "rtc.h"
 #include "usart.h"
-#include "wwdg.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -47,9 +47,14 @@
 
 /* USER CODE BEGIN PV */
 
-//		INPUT CAPTURE + BUTTON COMMIT
-//volatile uint32_t CounterTim2Chan1;
-//volatile uint32_t CounterTim2Chan2;
+RTC_TimeTypeDef RtcTime;
+RTC_DateTypeDef RtcDate;
+
+uint8_t CompareSeconds;
+float Milliseconds;
+
+uint8_t Message[64];
+uint8_t MessageLen;
 
 
 /* USER CODE END PV */
@@ -57,7 +62,7 @@
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-void SendUart(UART_HandleTypeDef *huart, uint8_t *Message);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -94,43 +99,40 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
-  MX_WWDG_Init();
+  MX_RTC_Init();
   /* USER CODE BEGIN 2 */
-  if(__HAL_RCC_GET_FLAG(RCC_FLAG_WWDGRST) != RESET)
-    {
-  	  SendUart(&huart2, "!!!!!WWDG RESET!!!!!\n\r");
 
-  	  __HAL_RCC_CLEAR_RESET_FLAGS();
-    }
-    else
-    {
-  	  SendUart(&huart2, "!!!!Normal Reset!!!!\n\r");
-    }
+  RtcTime.Hours = 23;
+  RtcTime.Minutes = 21;
+  RtcTime.Seconds = 3;
 
-
-
-
+  RtcDate.Date= 15;
+  RtcDate.Month = 11;
+  RtcDate.Year = 23;
+HAL_RTC_SetDate(&hrtc, &RtcDate, RTC_FORMAT_BIN);
+HAL_RTC_SetTime(&hrtc, &RtcTime, RTC_FORMAT_BIN);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  HAL_Delay(210);
+	  HAL_RTC_GetTime(&hrtc, &RtcTime, RTC_FORMAT_BIN);
+	  HAL_RTC_GetDate(&hrtc, &RtcDate, RTC_FORMAT_BIN);
 
-	  if(HAL_WWDG_Refresh(&hwwdg) != HAL_OK) /* Refresh Error */
-	 	  {
 
-	 		  Error_Handler();
-	 	  }
+	  // Milliseconds formula is taken from Reference Manual
+	  Milliseconds = ((RtcTime.SecondFraction-RtcTime.SubSeconds) /((float)RtcTime.SecondFraction+1) * 100);
 
-	 	  if(!HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin))
-	 	  {
-	 		  while(!HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin))
-	 		  {
-	 			  // do nothing
-	 		  }
-	 	  }
+	  if(Milliseconds != CompareSeconds)
+	  {
+		  MessageLen = sprintf((char*)Message, "Date: %02d.%02d.20%02d Time: %02d:%02d:%02d:%02d\n\r",
+				  RtcDate.Date, RtcDate.Month, RtcDate.Year, RtcTime.Hours, RtcTime.Minutes, RtcTime.Seconds, (uint8_t)Milliseconds);
+		  HAL_UART_Transmit(&huart2, Message, MessageLen, 100);
+		  CompareSeconds = Milliseconds;
+	  }
+
+
 
 
 
@@ -152,15 +154,21 @@ void SystemClock_Config(void)
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
   RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
+  /** Configure LSE Drive Capability
+  */
+  HAL_PWR_EnableBkUpAccess();
+  __HAL_RCC_LSEDRIVE_CONFIG(RCC_LSEDRIVE_LOW);
+
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSE;
+  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
-  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL8;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
   RCC_OscInitStruct.PLL.PREDIV = RCC_PREDIV_DIV1;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
@@ -173,15 +181,16 @@ void SystemClock_Config(void)
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV8;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
   }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART2;
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART2|RCC_PERIPHCLK_RTC;
   PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_PCLK1;
+  PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSE;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
     Error_Handler();
@@ -190,16 +199,7 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 
-void SendUart(UART_HandleTypeDef *huart, uint8_t *Message)
-{
-	HAL_UART_Transmit(huart, Message, strlen((const char*)Message), 100);
-}
 
-
-void HAL_WWDG_EarlyWakeupCallback(WWDG_HandleTypeDef *hwwdg)
-{
-	SendUart(&huart2, "!!!!!EarlyWakeupCallback!!!!!\n\r");
-}
 
 
 
