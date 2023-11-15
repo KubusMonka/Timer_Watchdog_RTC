@@ -18,13 +18,14 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "tim.h"
+#include "iwdg.h"
 #include "usart.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "string.h"
+#include "stdio.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -55,9 +56,8 @@
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
-static void MX_NVIC_Init(void);
 /* USER CODE BEGIN PFP */
-
+void SendUart(UART_HandleTypeDef *huart, uint8_t *Message);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -94,14 +94,19 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
-  MX_TIM2_Init();
-  MX_TIM1_Init();
-
-  /* Initialize interrupts */
-  MX_NVIC_Init();
+  MX_IWDG_Init();
   /* USER CODE BEGIN 2 */
-HAL_TIM_OnePulse_Start(&htim2, TIM_CHANNEL_2);
-HAL_TIM_Base_Start(&htim1);
+  if(__HAL_RCC_GET_FLAG(RCC_FLAG_IWDGRST) != RESET)
+    {
+  	  SendUart(&huart2, "!!!!!IWDG RESET!!!!!\n\r");
+
+  	  __HAL_RCC_CLEAR_RESET_FLAGS();
+    }
+    else
+    {
+  	  SendUart(&huart2, "!!!!Normal Reset!!!!\n\r");
+    }
+
 
 
 
@@ -111,6 +116,22 @@ HAL_TIM_Base_Start(&htim1);
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+
+	  if(HAL_IWDG_Refresh(&hiwdg) != HAL_OK) /* Refresh Error */
+	 	  {
+
+	 		  Error_Handler();
+	 	  }
+
+	 	  if(!HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin))
+	 	  {
+	 		  while(!HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin))
+	 		  {
+	 			  // do nothing
+	 		  }
+	 	  }
+
+	 	  HAL_Delay(400);
 
 
     /* USER CODE END WHILE */
@@ -133,9 +154,10 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
@@ -158,30 +180,20 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART2|RCC_PERIPHCLK_TIM1
-                              |RCC_PERIPHCLK_TIM2;
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART2;
   PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_PCLK1;
-  PeriphClkInit.Tim1ClockSelection = RCC_TIM1CLK_HCLK;
-  PeriphClkInit.Tim2ClockSelection = RCC_TIM2CLK_HCLK;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
     Error_Handler();
   }
 }
 
-/**
-  * @brief NVIC Configuration.
-  * @retval None
-  */
-static void MX_NVIC_Init(void)
-{
-  /* TIM2_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(TIM2_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(TIM2_IRQn);
-}
-
 /* USER CODE BEGIN 4 */
 
+void SendUart(UART_HandleTypeDef *huart, uint8_t *Message)
+{
+	HAL_UART_Transmit(huart, Message, strlen((const char*)Message), 100);
+}
 
 
 
