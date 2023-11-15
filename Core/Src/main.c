@@ -18,8 +18,8 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "iwdg.h"
 #include "usart.h"
+#include "wwdg.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -94,11 +94,11 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
-  MX_IWDG_Init();
+  MX_WWDG_Init();
   /* USER CODE BEGIN 2 */
-  if(__HAL_RCC_GET_FLAG(RCC_FLAG_IWDGRST) != RESET)
+  if(__HAL_RCC_GET_FLAG(RCC_FLAG_WWDGRST) != RESET)
     {
-  	  SendUart(&huart2, "!!!!!IWDG RESET!!!!!\n\r");
+  	  SendUart(&huart2, "!!!!!WWDG RESET!!!!!\n\r");
 
   	  __HAL_RCC_CLEAR_RESET_FLAGS();
     }
@@ -116,8 +116,9 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  HAL_Delay(210);
 
-	  if(HAL_IWDG_Refresh(&hiwdg) != HAL_OK) /* Refresh Error */
+	  if(HAL_WWDG_Refresh(&hwwdg) != HAL_OK) /* Refresh Error */
 	 	  {
 
 	 		  Error_Handler();
@@ -131,7 +132,7 @@ int main(void)
 	 		  }
 	 	  }
 
-	 	  HAL_Delay(400);
+
 
 
     /* USER CODE END WHILE */
@@ -154,13 +155,12 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
-  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL8;
   RCC_OscInitStruct.PLL.PREDIV = RCC_PREDIV_DIV1;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
@@ -173,7 +173,7 @@ void SystemClock_Config(void)
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV8;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
@@ -196,7 +196,10 @@ void SendUart(UART_HandleTypeDef *huart, uint8_t *Message)
 }
 
 
-
+void HAL_WWDG_EarlyWakeupCallback(WWDG_HandleTypeDef *hwwdg)
+{
+	SendUart(&huart2, "!!!!!EarlyWakeupCallback!!!!!\n\r");
+}
 
 
 
