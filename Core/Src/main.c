@@ -50,11 +50,17 @@
 RTC_TimeTypeDef RtcTime;
 RTC_DateTypeDef RtcDate;
 
+volatile RTC_TimeTypeDef RtcTimeTimeStamp; // volatile because it's used in interrupt!
+volatile RTC_DateTypeDef RtcDateTimeStamp;
+
+
 uint8_t CompareSeconds;
 
 
-uint8_t Message[64];
+uint8_t Message[128];
 uint8_t MessageLen;
+
+volatile uint8_t TimeStampFlag;
 
 
 /* USER CODE END PV */
@@ -62,7 +68,6 @@ uint8_t MessageLen;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_NVIC_Init(void);
-void Enter_LowPowerMode(void);
 /* USER CODE BEGIN PFP */
 void SetAlarm(void);
 /* USER CODE END PFP */
@@ -106,6 +111,10 @@ int main(void)
   /* Initialize interrupts */
   MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
+  if (HAL_RTCEx_SetTimeStamp_IT(&hrtc, RTC_TIMESTAMPEDGE_RISING, RTC_TIMESTAMPPIN_DEFAULT) != HAL_OK)
+  {
+    Error_Handler();
+  }
 
   //
   /*Time set in CubeMX and after reset go on because of "return" in MX_RTC_Init(); */
@@ -140,12 +149,14 @@ int main(void)
 		  HAL_UART_Transmit(&huart2, Message, MessageLen, 100);
 		  CompareSeconds = RtcTime.Seconds;
 	  }
-	  if(HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_RESET)
+
+	  if(TimeStampFlag == 1)
 	  {
-		  Enter_LowPowerMode();
-		  while(HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_RESET)
-		  {}
+	  	  MessageLen = sprintf((char*)Message, "Time Stamp - Date: %02d.%02d.20%02d Time: %02d:%02d:%02d\n\r", RtcDateTimeStamp.Date, RtcDateTimeStamp.Month, RtcDateTimeStamp.Year, RtcTimeTimeStamp.Hours, RtcTimeTimeStamp.Minutes, RtcTimeTimeStamp.Seconds);
+	  	  HAL_UART_Transmit(&huart2, Message, MessageLen, 100);
+	  	  TimeStampFlag = 0;
 	  }
+
 
 
 
@@ -216,49 +227,16 @@ void SystemClock_Config(void)
   */
 static void MX_NVIC_Init(void)
 {
-  /* RTC_WKUP_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(RTC_WKUP_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(RTC_WKUP_IRQn);
+  /* TAMP_STAMP_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(TAMP_STAMP_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(TAMP_STAMP_IRQn);
 }
 
 /* USER CODE BEGIN 4 */
-
-void Enter_LowPowerMode(void)
+void HAL_RTCEx_TimeStampEventCallback(RTC_HandleTypeDef *hrtc)
 {
-  /*## Enter STOP low power Mode ##########################################*/
-  /**
-  RTC Wakeup Interrupt Generation:
-  Wakeup Time Base = (RTC_WAKEUPCLOCK_RTCCLK_DIV /(LSE or LSI))
-  Wakeup Time = Wakeup Time Base * WakeUpCounter
-              = (RTC_WAKEUPCLOCK_RTCCLK_DIV /(LSE or LSI)) * WakeUpCounter
-  ==> WakeUpCounter = Wakeup Time / Wakeup Time Base
-
-  To configure the wake up timer to 5 s the WakeUpCounter is set to 0x2FA8:
-  RTC_WAKEUPCLOCK_RTCCLK_DIV = RTCCLK_Div16 = 16
-  Wakeup Time Base = 16 /(~32.000KHz) = ~0,5 ms
-  Wakeup Time = 5 s = 0,5ms  * WakeUpCounter
-  ==> WakeUpCounter = 5/0,5ms = 0x2710
-  **/
-  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, 10416, RTC_WAKEUPCLOCK_RTCCLK_DIV16);
-
-  HAL_SuspendTick();            /* To Avoid timer wake-up. */
-
-  /**
-  In PWR_MAINREGULATOR_ON mode, we measure 13.8/15.2uA on JP6
-  **/
-  HAL_PWR_EnterSTOPMode(PWR_MAINREGULATOR_ON,PWR_STOPENTRY_WFI);
-
-  /**
-  In PWR_LOWPOWERREGULATOR_ON mode, we measure 1.3/2.7uA on JP6
-  HAL_PWR_EnterSTOPMode(PWR_LOWPOWERREGULATOR_ON,PWR_STOPENTRY_WFI);
-  **/
-
-  /* We are now waiting for TAMPERF1 or WAKEUP interrupts (or Reset) */
-
-  HAL_ResumeTick();       /* Needed in case of Timer usage. */
-  HAL_RTCEx_DeactivateWakeUpTimer(&hrtc);
-
-  SystemClock_Config();   /* Re-configure the system clock */
+	HAL_RTCEx_GetTimeStamp(hrtc, &RtcTimeTimeStamp,  &RtcDateTimeStamp, RTC_FORMAT_BIN);
+	TimeStampFlag = 1;
 }
 
 

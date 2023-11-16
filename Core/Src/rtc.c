@@ -36,6 +36,7 @@ void MX_RTC_Init(void)
 
   RTC_TimeTypeDef sTime = {0};
   RTC_DateTypeDef sDate = {0};
+  RTC_TamperTypeDef sTamper = {0};
 
   /* USER CODE BEGIN RTC_Init 1 */
 
@@ -80,9 +81,16 @@ void MX_RTC_Init(void)
     Error_Handler();
   }
 
-  /** Enable the WakeUp
+  /** Enable the RTC Tamper 1
   */
-  if (HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, 10416, RTC_WAKEUPCLOCK_RTCCLK_DIV16) != HAL_OK)
+  sTamper.Tamper = RTC_TAMPER_1;
+  sTamper.Trigger = RTC_TAMPERTRIGGER_RISINGEDGE;
+  sTamper.Filter = RTC_TAMPERFILTER_DISABLE;
+  sTamper.SamplingFrequency = RTC_TAMPERSAMPLINGFREQ_RTCCLK_DIV32768;
+  sTamper.PrechargeDuration = RTC_TAMPERPRECHARGEDURATION_1RTCCLK;
+  sTamper.TamperPullUp = RTC_TAMPER_PULLUP_ENABLE;
+  sTamper.TimeStampOnTamperDetection = RTC_TIMESTAMPONTAMPERDETECTION_ENABLE;
+  if (HAL_RTCEx_SetTamper_IT(&hrtc, &sTamper) != HAL_OK)
   {
     Error_Handler();
   }
@@ -120,7 +128,7 @@ void HAL_RTC_MspDeInit(RTC_HandleTypeDef* rtcHandle)
     __HAL_RCC_RTC_DISABLE();
 
     /* RTC interrupt Deinit */
-    HAL_NVIC_DisableIRQ(RTC_WKUP_IRQn);
+    HAL_NVIC_DisableIRQ(TAMP_STAMP_IRQn);
   /* USER CODE BEGIN RTC_MspDeInit 1 */
 
   /* USER CODE END RTC_MspDeInit 1 */
