@@ -102,15 +102,22 @@ int main(void)
   MX_RTC_Init();
   /* USER CODE BEGIN 2 */
 
-  RtcTime.Hours = 23;
-  RtcTime.Minutes = 21;
-  RtcTime.Seconds = 3;
+  //
+  /*Time set in CubeMX and after reset go on because of "return" in MX_RTC_Init(); */
+  //
+	//  RtcTime.Hours = 23;
+	//  RtcTime.Minutes = 21;
+	//  RtcTime.Seconds = 3;
+	//
+	//  RtcDate.Date= 15;
+	//  RtcDate.Month = 11;
+	//  RtcDate.Year = 22;
+	//HAL_RTC_SetDate(&hrtc, &RtcDate, RTC_FORMAT_BIN);
+	//HAL_RTC_SetTime(&hrtc, &RtcTime, RTC_FORMAT_BIN);
 
-  RtcDate.Date= 15;
-  RtcDate.Month = 11;
-  RtcDate.Year = 23;
-HAL_RTC_SetDate(&hrtc, &RtcDate, RTC_FORMAT_BIN);
-HAL_RTC_SetTime(&hrtc, &RtcTime, RTC_FORMAT_BIN);
+
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
