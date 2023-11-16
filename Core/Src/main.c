@@ -62,7 +62,7 @@ uint8_t MessageLen;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_NVIC_Init(void);
-
+void Enter_LowPowerMode(void);
 /* USER CODE BEGIN PFP */
 void SetAlarm(void);
 /* USER CODE END PFP */
@@ -129,23 +129,23 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+
+
 	  HAL_RTC_GetTime(&hrtc, &RtcTime, RTC_FORMAT_BIN);
-	 	  HAL_RTC_GetDate(&hrtc, &RtcDate, RTC_FORMAT_BIN);
+	  HAL_RTC_GetDate(&hrtc, &RtcDate, RTC_FORMAT_BIN);
 
-	 	  if(RtcTime.Seconds != CompareSeconds)
-	 	  {
-	 		  MessageLen = sprintf((char*)Message, "Date: %02d.%02d.20%02d Time: %02d:%02d:%02d\n\r", RtcDate.Date, RtcDate.Month, RtcDate.Year, RtcTime.Hours, RtcTime.Minutes, RtcTime.Seconds);
-	 		  HAL_UART_Transmit(&huart2, Message, MessageLen, 100);
-	 		  CompareSeconds = RtcTime.Seconds;
-	 	  }
-	 	  if(HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_RESET)
-	 	  {
-	 		  SetAlarm();
-	 		  while(HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_RESET)
-	 		  {}
-	 	  }
-
-
+	  if(RtcTime.Seconds != CompareSeconds)
+	  {
+		  MessageLen = sprintf((char*)Message, "Date: %02d.%02d.20%02d Time: %02d:%02d:%02d\n\r", RtcDate.Date, RtcDate.Month, RtcDate.Year, RtcTime.Hours, RtcTime.Minutes, RtcTime.Seconds);
+		  HAL_UART_Transmit(&huart2, Message, MessageLen, 100);
+		  CompareSeconds = RtcTime.Seconds;
+	  }
+	  if(HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_RESET)
+	  {
+		  Enter_LowPowerMode();
+		  while(HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_RESET)
+		  {}
+	  }
 
 
 
@@ -216,61 +216,50 @@ void SystemClock_Config(void)
   */
 static void MX_NVIC_Init(void)
 {
-  /* RTC_Alarm_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(RTC_Alarm_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(RTC_Alarm_IRQn);
+  /* RTC_WKUP_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(RTC_WKUP_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(RTC_WKUP_IRQn);
 }
 
 /* USER CODE BEGIN 4 */
-void SetAlarm(void)
+
+void Enter_LowPowerMode(void)
 {
-	  RTC_TimeTypeDef sTime = {0};
-	  RTC_DateTypeDef sDate = {0};
-	  RTC_AlarmTypeDef sAlarm = {0};
+  /*## Enter STOP low power Mode ##########################################*/
+  /**
+  RTC Wakeup Interrupt Generation:
+  Wakeup Time Base = (RTC_WAKEUPCLOCK_RTCCLK_DIV /(LSE or LSI))
+  Wakeup Time = Wakeup Time Base * WakeUpCounter
+              = (RTC_WAKEUPCLOCK_RTCCLK_DIV /(LSE or LSI)) * WakeUpCounter
+  ==> WakeUpCounter = Wakeup Time / Wakeup Time Base
 
-	   sTime.Hours = 20;
-	   sTime.Minutes = 30;
-	   sTime.Seconds = 15;
-	   sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
-	   sTime.StoreOperation = RTC_STOREOPERATION_RESET;
-	   if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK)
-	   {
-	     Error_Handler();
-	   }
-	   sDate.WeekDay = RTC_WEEKDAY_MONDAY;
-	   sDate.Month = RTC_MONTH_APRIL;
-	   sDate.Date = 9;
-	   sDate.Year = 22;
+  To configure the wake up timer to 5 s the WakeUpCounter is set to 0x2FA8:
+  RTC_WAKEUPCLOCK_RTCCLK_DIV = RTCCLK_Div16 = 16
+  Wakeup Time Base = 16 /(~32.000KHz) = ~0,5 ms
+  Wakeup Time = 5 s = 0,5ms  * WakeUpCounter
+  ==> WakeUpCounter = 5/0,5ms = 0x2710
+  **/
+  HAL_RTCEx_SetWakeUpTimer_IT(&hrtc, 10416, RTC_WAKEUPCLOCK_RTCCLK_DIV16);
 
-	   if (HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN) != HAL_OK)
-	   {
-	     Error_Handler();
-	   }
-	  /** Enable the Alarm A
-	  */
-	  sAlarm.AlarmTime.Hours = 20;
-	  sAlarm.AlarmTime.Minutes = 30;
-	  sAlarm.AlarmTime.Seconds = 20;
-	  sAlarm.AlarmTime.SubSeconds = 0x0;
-	  sAlarm.AlarmTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
-	  sAlarm.AlarmTime.StoreOperation = RTC_STOREOPERATION_RESET;
-	  sAlarm.AlarmMask = RTC_ALARMMASK_NONE;
-	  sAlarm.AlarmSubSecondMask = RTC_ALARMSUBSECONDMASK_ALL;
-	  sAlarm.AlarmDateWeekDaySel = RTC_ALARMDATEWEEKDAYSEL_DATE;
-	  sAlarm.AlarmDateWeekDay = 0x9;
-	  sAlarm.Alarm = RTC_ALARM_A;
-	  if (HAL_RTC_SetAlarm_IT(&hrtc, &sAlarm, RTC_FORMAT_BIN) != HAL_OK)
-	  {
-	    Error_Handler();
-	  }
+  HAL_SuspendTick();            /* To Avoid timer wake-up. */
+
+  /**
+  In PWR_MAINREGULATOR_ON mode, we measure 13.8/15.2uA on JP6
+  **/
+  HAL_PWR_EnterSTOPMode(PWR_MAINREGULATOR_ON,PWR_STOPENTRY_WFI);
+
+  /**
+  In PWR_LOWPOWERREGULATOR_ON mode, we measure 1.3/2.7uA on JP6
+  HAL_PWR_EnterSTOPMode(PWR_LOWPOWERREGULATOR_ON,PWR_STOPENTRY_WFI);
+  **/
+
+  /* We are now waiting for TAMPERF1 or WAKEUP interrupts (or Reset) */
+
+  HAL_ResumeTick();       /* Needed in case of Timer usage. */
+  HAL_RTCEx_DeactivateWakeUpTimer(&hrtc);
+
+  SystemClock_Config();   /* Re-configure the system clock */
 }
-
-void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc)
-{
-	  MessageLen = sprintf((char*)Message, "!!!ALARM!!!\n\r");
-	  HAL_UART_Transmit(&huart2, Message, MessageLen, 100);
-}
-
 
 
 /* USER CODE END 4 */
